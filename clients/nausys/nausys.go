@@ -3,6 +3,7 @@ package nausys
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
@@ -17,37 +18,49 @@ type nausysCreds struct {
 	Password string `json:"password"`
 }
 
+type Charter struct {
+	Id   int64  `json:"id",db:"id"`
+	Name string `json:"name",db:"name"`
+}
+
 type GetAllChartersResponse struct {
-	Status    string `json:"status"`
-	Companies []struct {
-		Id   int64  `json:"id"`
-		Name string `json:"name"`
-	} `json:"companies"`
+	Status    string    `json:"status"`
+	Companies []Charter `json:"companies"`
+}
+
+type Yacht struct {
+	Id            int64        `json:"id",db:"id"`
+	Name          string       `json:"name",name:"name"`
+	CharterId     int64        `json:"companyId",db:"charter_id"`
+	ModelId       int64        `json:"yachtModelId",db:"model_id"`
+	AvailableFrom sql.NullTime `db:"available_from"`
+	AvailableTo   sql.NullTime `db:"available_to"`
 }
 
 type GetCharterBoatsResponse struct {
-	Status string `json:"status"`
-	Yachts []struct {
-		Id      int64  `json:"id"`
-		Name    string `json:"name"`
-		ModelId int64  `json:"yachtModelId"`
-	} `json:"yachts"`
+	Status string   `json:"status"`
+	Yachts []*Yacht `json:"yachts"`
+}
+
+type Model struct {
+	Id        int64  `json:"id",db:"id"`
+	Name      string `json:"name",db:"name"`
+	BuilderId int64  `json:"yachtBuilderId",db:"builder_id"`
 }
 
 type GetModelsResponse struct {
-	Status string `json:"status"`
-	Models []struct {
-		Id        int64 `json:"id"`
-		BuilderId int64 `json:"yachtBuilderId"`
-	} `json:"models"`
+	Status string  `json:"status"`
+	Models []Model `json:"models"`
+}
+
+type Builder struct {
+	Id   int64  `json:"id",db:"id"`
+	Name string `json:"name",db:"name"`
 }
 
 type GetBuildersResponse struct {
-	Status   string `json:"status"`
-	Builders []struct {
-		Id   int64  `json:"id"`
-		Name string `json:"name"`
-	} `json:"builders"`
+	Status   string    `json:"status"`
+	Builders []Builder `json:"builders"`
 }
 
 type GetOccupancyResponse struct {

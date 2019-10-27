@@ -9,6 +9,7 @@ import (
 
 type Config interface {
 	GetEnableDebugLogs() bool
+	GetDSN() string
 	GetNausysAddr() string
 	GetNausysUser() string
 	GetNausysPass() string
@@ -16,6 +17,10 @@ type Config interface {
 
 func (d *Desc) GetEnableDebugLogs() bool {
 	return d.EnableDebugLogs
+}
+
+func (d *Desc) GetDSN() string {
+	return d.DSN
 }
 
 func (d *Desc) GetNausysAddr() string {
@@ -51,6 +56,9 @@ func Init(configPath string) (Config, error) {
 }
 
 func validate(d *Desc) error {
+	if d.DSN == "" {
+		return errors.Errorf("%q missing", "dsn")
+	}
 	if d.NausysAddr == "" {
 		return errors.Errorf("%q missing", "nausys_addr")
 	}
