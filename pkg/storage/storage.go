@@ -3,7 +3,10 @@ package storage
 import (
 	"boats/clients/nausys"
 	"context"
+	"database/sql"
+	"fmt"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	"time"
 )
 
@@ -13,8 +16,8 @@ type YachtInfo struct {
 	ModelName     string    `db:"model_name"`
 	CharterName   string    `db:"charter_name"`
 	AvailableNow  bool      `db:"available_now"`
-	AvailableFrom time.Time `db:"available_from"`
-	AvailableTo   time.Time `db:"available_to"`
+	AvailableFrom sql.NullTime `db:"available_from"`
+	AvailableTo   sql.NullTime `db:"available_to"`
 }
 
 type Storage interface {
@@ -97,10 +100,22 @@ func (s *StorageImpl) InsertUpdateInfo(ctx context.Context) error {
 	return err
 }
 
-//
-//func (s *StorageImpl) FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error) {
-//	err = s.db.SelectContext(ctx, &yachts, `
-//SELECT
-//`)
-//	return
-//}
+
+func (s *StorageImpl) FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error) {
+	// TODO: use transaction
+	queryCommon := `
+SELECT %s
+FROM yachts Y JOIN charters C on Y.charter_id = C.id JOIN models M on Y.model_id = M.id JOIN builders B on M.builder_id = B.id
+WHERE B.name LIKE $1 AND M.name LIKE $2`
+	if err = s.db.GetContext(ctx, &total, fmt.Sprintf(queryCommon, "COUNT(*)"), builderNamePrefix+"%", modelNamePrefix+"%"); err != nil {
+		err = errors.Wrap(err, "select total number of yachts")
+		return
+	}
+	query := fmt.Sprintf(queryCommon, "Y.name AS name, B.name AS builder_name, M.name AS model_name, C.name AS charter_name, COALESCE(Y.available_from < NOW(), TRUE) AS available_now, Y.available_from, Y.available_to") +
+		"OFFSET $3 LIMIT $4;"
+	if err = s.db.SelectContext(ctx, &yachts, query, builderNamePrefix+"%", modelNamePrefix+"%", offset, limit); err != nil {
+		err = errors.Wrap(err, "select yachts")
+		return
+	}
+	return
+}
