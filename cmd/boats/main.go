@@ -34,9 +34,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	//http.HandleFunc("/v1/boats/update", func(w http.ResponseWriter, r *http.Request) {
-	//
-	//}
+	http.HandleFunc("/v1/boats/update", func(w http.ResponseWriter, r *http.Request) {
+		if err := syncer.Sync(ctx, true); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	})
 
 	//http.HandleFunc("/v1/boats/suggest", func(w http.ResponseWriter, r *http.Request) {
 	//
