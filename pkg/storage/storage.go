@@ -28,7 +28,7 @@ type Storage interface {
 	InsertCharters(ctx context.Context, charters []nausys.Charter) error
 	InsertYachts(ctx context.Context, yachts []*nausys.Yacht) error
 	InsertUpdateInfo(ctx context.Context) error
-	//FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error)
+	FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error)
 }
 
 type StorageImpl struct {

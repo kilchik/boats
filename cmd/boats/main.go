@@ -63,6 +63,9 @@ func main() {
 		})
 		fmt.Fprint(w, string(resp))
 	})
+
+	http.Handle("/", http.FileServer(http.Dir("./static")))
+
 	if err := http.ListenAndServe("localhost:9876", nil); err != nil {
 		logo.Error(ctx, "run server: %v", err)
 		os.Exit(1)
