@@ -115,7 +115,7 @@ new Vue({
 
     methods: {
         getSuggestsParent: function(name, currentInput) {
-            axios.get(`/suggest?param=${name}&prefix=${currentInput}`)
+            axios.get(`/v1/suggest?param=${name}&prefix=${currentInput}`)
                 .then((response) => {
                     if (name === "builders") {
                         this.buildersList = response.data;

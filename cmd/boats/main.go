@@ -16,7 +16,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
+
+const updateInterval = 1*time.Second
 
 func main() {
 	confPath := flag.String("conf", "boats.toml", "specify path to configuration file")
@@ -38,14 +41,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	syncGuard := time.NewTimer(updateInterval)
 	http.HandleFunc("/v1/boats/update", func(w http.ResponseWriter, r *http.Request) {
-		if err := syncer.Sync(ctx, true); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+		select {
+		case <-syncGuard.C:
+		default:
+			logo.Debug(ctx, "sync in progress")
+			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
+
+		go func() {
+			if err := syncer.Sync(ctx, true); err != nil {
+				logo.Error(ctx, "sync: %v", err)
+			}
+			syncGuard.Reset(updateInterval)
+		}()
 	})
 
-	http.HandleFunc("/suggest", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/v1/suggest", func(w http.ResponseWriter, r *http.Request) {
 		param := r.URL.Query().Get("param")
 		prefix := r.URL.Query().Get("prefix")
 		if param == "" || prefix == "" {

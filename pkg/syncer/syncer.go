@@ -5,6 +5,7 @@ import (
 	"boats/pkg/storage"
 	"context"
 	"database/sql"
+	"github.com/kilchik/logo/pkg/logo"
 	"github.com/pkg/errors"
 	"sort"
 	"time"
@@ -15,18 +16,22 @@ type Syncer interface {
 }
 
 type SyncerImpl struct {
-	nausys  nausys.NausysClient
-	storage storage.Storage
+	nausys     nausys.NausysClient
+	storage    storage.Storage
 }
 
 func NewSyncerImpl(nausys nausys.NausysClient, storage storage.Storage) *SyncerImpl {
 	return &SyncerImpl{
-		nausys:  nausys,
-		storage: storage,
+		nausys:     nausys,
+		storage:    storage,
 	}
 }
 
 func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
+	defer func() {
+		logo.Info(ctx, "synchronized with nausys")
+	}()
+
 	if force {
 		if err := s.storage.ClearAll(ctx); err != nil {
 			return errors.Wrap(err, "clear all")
