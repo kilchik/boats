@@ -29,6 +29,8 @@ type Storage interface {
 	InsertYachts(ctx context.Context, yachts []*nausys.Yacht) error
 	InsertUpdateInfo(ctx context.Context) error
 	FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error)
+	FindBuildersByPrefix(ctx context.Context, prefix string, limit int) ([]string, error)
+	FindModelsByPrefix(ctx context.Context, prefix string, limit int) ([]string, error)
 }
 
 type StorageImpl struct {
@@ -119,3 +121,21 @@ WHERE B.name LIKE $1 AND M.name LIKE $2`
 	}
 	return
 }
+
+func (s *StorageImpl) FindBuildersByPrefix(ctx context.Context, prefix string, limit int) ([]string, error) {
+	var res []string
+	if err := s.db.SelectContext(ctx, &res, `SELECT name FROM builders WHERE name LIKE $1 LIMIT $2;`, prefix+"%", limit); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (s *StorageImpl) FindModelsByPrefix(ctx context.Context, prefix string, limit int) ([]string, error) {
+	var res []string
+	if err := s.db.SelectContext(ctx, &res, `SELECT name FROM models WHERE name LIKE $1 LIMIT $2;`, prefix+"%", limit); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+

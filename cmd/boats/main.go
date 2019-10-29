@@ -41,9 +41,34 @@ func main() {
 		}
 	})
 
-	//http.HandleFunc("/v1/boats/suggest", func(w http.ResponseWriter, r *http.Request) {
-	//
-	//}
+	http.HandleFunc("/suggest", func(w http.ResponseWriter, r *http.Request) {
+		param := r.URL.Query().Get("param")
+		prefix := r.URL.Query().Get("prefix")
+		if param == "" || prefix == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		var names []string
+		switch param {
+		case "builders":
+			names, err = storage.FindBuildersByPrefix(ctx, prefix, 5)
+		case "models":
+			names, err = storage.FindModelsByPrefix(ctx, prefix, 5)
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if err != nil {
+			logo.Error(ctx, "find names by prefix in db: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(names); err != nil {
+			logo.Error(ctx, "send suggested names: %v", err)
+		}
+	})
 
 	http.HandleFunc("/v1/boats/find", func(w http.ResponseWriter, r *http.Request) {
 		builderName := r.URL.Query().Get("builder")

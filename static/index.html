@@ -11,14 +11,8 @@
             <div class="row justify-content-md-center">
                 <div class="col-6" style="margin-top: 20px">
                     <form>
-                        <div class="form-group">
-                            <label for="inputBuilder">Builder</label>
-                            <input v-model="builderName" class="form-control" id="inputBuilder" placeholder="Enter builder name">
-                        </div>
-                        <div class="form-group">
-                            <label for="inputModel">Model</label>
-                            <input v-model="modelName" class="form-control" id="inputModel" placeholder="Enter model name">
-                        </div>
+                        <suggests v-on:change-name="changeBuilderName" v-on:get-suggests="getSuggestsParent" sname="builders" lname="Builder" :suggest-list="buildersList"></suggests>
+                        <suggests v-on:change-name="changeModelName" v-on:get-suggests="getSuggestsParent" sname="models" lname="Model" :suggest-list="modelsList"></suggests>
                         <button @click="onFind" type="submit" class="btn btn-primary">Find</button>
                     </form>
                 </div>
@@ -41,16 +35,21 @@
                         <tbody>
                         <tr v-for="boat in boatsList">
                             <th scope="row"></th>
-                            <td>${boat.Name}</td>
-                            <td>${boat.BuilderName}</td>
-                            <td>${boat.ModelName}</td>
-                            <td>${boat.CharterName}</td>
-                            <td>${boat.AvailableNow}</td>
-                            <td>${boat.AvailableFrom}</td>
-                            <td>${boat.AvailableTo}</td>
+                            <td>{{boat.Name}}</td>
+                            <td>{{boat.BuilderName}}</td>
+                            <td>{{boat.ModelName}}</td>
+                            <td>{{boat.CharterName}}</td>
+                            <td>{{boat.AvailableNow}}</td>
+                            <td>{{boat.AvailableFrom}}</td>
+                            <td>{{boat.AvailableTo}}</td>
                         </tr>
                         </tbody>
                     </table>>
+                </div>
+            </div>
+            <div class="row justify-content-md-center"  style="margin-top: 20px">
+                <div class="alert alert-danger" role="alert" v-if="errorMsg">
+                    {{errorMsg}}
                 </div>
             </div>
         </div>
