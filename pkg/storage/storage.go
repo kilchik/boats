@@ -21,13 +21,16 @@ type YachtInfo struct {
 }
 
 type Storage interface {
-	ClearAll(ctx context.Context) error
+	WithTransaction(ctx context.Context, f func(tx *sqlx.Tx) error) (err error)
+
+	ClearAll(ctx context.Context, tx *sqlx.Tx) error
 	GetLastUpdateInfo(ctx context.Context) (time.Time, error)
-	InsertBuilders(ctx context.Context, builders []nausys.Builder) error
-	InsertModels(ctx context.Context, models []nausys.Model) error
-	InsertCharters(ctx context.Context, charters []nausys.Charter) error
-	InsertYachts(ctx context.Context, yachts []*nausys.Yacht) error
-	InsertUpdateInfo(ctx context.Context) error
+	InsertBuilders(ctx context.Context, tx *sqlx.Tx,  builders []nausys.Builder) error
+	InsertModels(ctx context.Context, tx *sqlx.Tx, models []nausys.Model) error
+	InsertCharters(ctx context.Context, tx *sqlx.Tx, charters []nausys.Charter) error
+	InsertYachts(ctx context.Context, tx *sqlx.Tx, yachts []*nausys.Yacht) error
+	InsertUpdateInfo(ctx context.Context, tx *sqlx.Tx) error
+
 	FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error)
 	FindBuildersByPrefix(ctx context.Context, prefix string, limit int) ([]string, error)
 	FindModelsByPrefix(ctx context.Context, prefix string, limit int) ([]string, error)
@@ -41,15 +44,43 @@ func NewStorageImpl(db *sqlx.DB) *StorageImpl {
 	return &StorageImpl{db}
 }
 
-func (s *StorageImpl) ClearAll(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `
+func (s *StorageImpl) WithTransaction(ctx context.Context, f func(tx *sqlx.Tx) error) (err error) {
+	var trx *sqlx.Tx
+	trx, err = s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "begin transaction")
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recover after panic: %v", r)
+		}
+		for {
+			if err != nil {
+				if errRollback := trx.Rollback(); errRollback != nil {
+					err = errors.Wrapf(errRollback, fmt.Sprintf("rollback after error: %v", err))
+				}
+				return
+			}
+			if err := trx.Commit(); err != nil {
+				err = errors.Wrapf(err, "commit transaction")
+			} else {
+				return
+			}
+		}
+	}()
+	err = f(trx)
+	return err
+}
+
+func (s *StorageImpl) ClearAll(ctx context.Context, tx *sqlx.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 TRUNCATE models, charters, builders, yachts, update_info;`)
 	return err
 }
 
-func (s *StorageImpl) InsertBuilders(ctx context.Context, builders []nausys.Builder) error {
+func (s *StorageImpl) InsertBuilders(ctx context.Context, tx *sqlx.Tx, builders []nausys.Builder) error {
 	for _, builder := range builders {
-		_, err := s.db.ExecContext(ctx, "INSERT INTO builders(id, name) VALUES ($1, $2)", builder.Id, builder.Name)
+		_, err := tx.ExecContext(ctx, "INSERT INTO builders(id, name) VALUES ($1, $2)", builder.Id, builder.Name)
 		if err != nil {
 			return err
 		}
@@ -58,9 +89,9 @@ func (s *StorageImpl) InsertBuilders(ctx context.Context, builders []nausys.Buil
 	return nil
 }
 
-func (s *StorageImpl) InsertModels(ctx context.Context, models []nausys.Model) error {
+func (s *StorageImpl) InsertModels(ctx context.Context, tx *sqlx.Tx, models []nausys.Model) error {
 	for _, model := range models {
-		_, err := s.db.ExecContext(ctx, "INSERT INTO models(id, name, builder_id) VALUES ($1, $2, $3)",
+		_, err := tx.ExecContext(ctx, "INSERT INTO models(id, name, builder_id) VALUES ($1, $2, $3)",
 			model.Id, model.Name, model.BuilderId)
 		if err != nil {
 			return err
@@ -69,9 +100,9 @@ func (s *StorageImpl) InsertModels(ctx context.Context, models []nausys.Model) e
 	return nil
 }
 
-func (s *StorageImpl) InsertCharters(ctx context.Context, charters []nausys.Charter) error {
+func (s *StorageImpl) InsertCharters(ctx context.Context, tx *sqlx.Tx, charters []nausys.Charter) error {
 	for _, charter := range charters {
-		_, err := s.db.ExecContext(ctx, "INSERT INTO charters(id, name) VALUES ($1, $2)", charter.Id, charter.Name)
+		_, err := tx.ExecContext(ctx, "INSERT INTO charters(id, name) VALUES ($1, $2)", charter.Id, charter.Name)
 		if err != nil {
 			return err
 		}
@@ -79,9 +110,9 @@ func (s *StorageImpl) InsertCharters(ctx context.Context, charters []nausys.Char
 	return nil
 }
 
-func (s *StorageImpl) InsertYachts(ctx context.Context, yachts []*nausys.Yacht) error {
+func (s *StorageImpl) InsertYachts(ctx context.Context, tx *sqlx.Tx, yachts []*nausys.Yacht) error {
 	for _, yacht := range yachts {
-		_, err := s.db.ExecContext(ctx, `
+		_, err := tx.ExecContext(ctx, `
 INSERT INTO yachts(id, name, model_id, charter_id, available_from, available_to) VALUES ($1, $2, $3, $4, $5, $6)`,
 			yacht.Id, yacht.Name, yacht.ModelId, yacht.CharterId, yacht.AvailableFrom, yacht.AvailableTo)
 		if err != nil {
@@ -97,28 +128,31 @@ func (s *StorageImpl) GetLastUpdateInfo(ctx context.Context) (time.Time, error) 
 	return updatedAt, err
 }
 
-func (s *StorageImpl) InsertUpdateInfo(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO update_info(moment) VALUES (NOW())`)
+func (s *StorageImpl) InsertUpdateInfo(ctx context.Context, tx *sqlx.Tx) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO update_info(moment) VALUES (NOW())`)
 	return err
 }
 
 
 func (s *StorageImpl) FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error) {
-	// TODO: use transaction
 	queryCommon := `
 SELECT %s
 FROM yachts Y JOIN charters C on Y.charter_id = C.id JOIN models M on Y.model_id = M.id JOIN builders B on M.builder_id = B.id
 WHERE B.name LIKE $1 AND M.name LIKE $2`
-	if err = s.db.GetContext(ctx, &total, fmt.Sprintf(queryCommon, "COUNT(*)"), builderNamePrefix+"%", modelNamePrefix+"%"); err != nil {
-		err = errors.Wrap(err, "select total number of yachts")
-		return
-	}
-	query := fmt.Sprintf(queryCommon, "Y.name AS name, B.name AS builder_name, M.name AS model_name, C.name AS charter_name, COALESCE(Y.available_from < NOW(), TRUE) AS available_now, Y.available_from, Y.available_to") +
-		"OFFSET $3 LIMIT $4;"
-	if err = s.db.SelectContext(ctx, &yachts, query, builderNamePrefix+"%", modelNamePrefix+"%", offset, limit); err != nil {
-		err = errors.Wrap(err, "select yachts")
-		return
-	}
+	err = s.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		if err = tx.GetContext(ctx, &total, fmt.Sprintf(queryCommon, "COUNT(*)"), builderNamePrefix+"%", modelNamePrefix+"%"); err != nil {
+			return errors.Wrap(err, "select total number of yachts")
+		}
+
+		query := fmt.Sprintf(queryCommon, "Y.name AS name, B.name AS builder_name, M.name AS model_name, C.name AS charter_name, COALESCE(Y.available_from < NOW(), TRUE) AS available_now, Y.available_from, Y.available_to") +
+			"OFFSET $3 LIMIT $4;"
+		if err = tx.SelectContext(ctx, &yachts, query, builderNamePrefix+"%", modelNamePrefix+"%", offset, limit); err != nil {
+			return errors.Wrap(err, "select yachts")
+		}
+
+		return nil
+	})
+
 	return
 }
 

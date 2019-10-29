@@ -5,6 +5,7 @@ import (
 	"boats/pkg/storage"
 	"context"
 	"database/sql"
+	"github.com/jmoiron/sqlx"
 	"github.com/kilchik/logo/pkg/logo"
 	"github.com/pkg/errors"
 	"sort"
@@ -28,15 +29,7 @@ func NewSyncerImpl(nausys nausys.NausysClient, storage storage.Storage) *SyncerI
 }
 
 func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
-	defer func() {
-		logo.Info(ctx, "synchronized with nausys")
-	}()
-
-	if force {
-		if err := s.storage.ClearAll(ctx); err != nil {
-			return errors.Wrap(err, "clear all")
-		}
-	} else {
+	if !force {
 		_, err := s.storage.GetLastUpdateInfo(ctx)
 		if err == nil {
 			// Already synced and no force demanded
@@ -47,28 +40,21 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 		}
 	}
 
+	// Retrieve data from Nausys
+	logo.Info(ctx, "retrieving data from nausys...")
 	buildersResp, err := s.nausys.GetBuilders(ctx)
 	if err != nil || buildersResp.Status != "OK" {
 		return errors.Wrapf(err, "get builders")
-	}
-	if err := s.storage.InsertBuilders(ctx, buildersResp.Builders); err != nil {
-		return errors.Wrap(err, "insert builders into db")
 	}
 
 	modelsResp, err := s.nausys.GetModels(ctx)
 	if err != nil || modelsResp.Status != "OK" {
 		return errors.Wrapf(err, "get models")
 	}
-	if err := s.storage.InsertModels(ctx, modelsResp.Models); err != nil {
-		return errors.Wrap(err, "insert models into db")
-	}
 
 	chartersResp, err := s.nausys.GetAllCharters(ctx)
 	if err != nil || chartersResp.Status != "OK" {
 		return errors.Wrapf(err, "get charters")
-	}
-	if err := s.storage.InsertCharters(ctx, chartersResp.Companies); err != nil {
-		return errors.Wrap(err, "insert charters into db")
 	}
 
 	parseReservTime := func(str string) time.Time {
@@ -78,6 +64,8 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 		}
 		return res
 	}
+
+	var yachts []*nausys.Yacht
 	for _, charter := range chartersResp.Companies {
 		occupRes, err := s.nausys.GetOccupancy(ctx, charter.Id, time.Now().Year())
 		if err != nil {
@@ -123,14 +111,42 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 				}
 			}
 		}
-		if err := s.storage.InsertYachts(ctx, chartersResp.Yachts); err != nil {
-			return errors.Wrap(err, "insert yachts into db")
-		}
+		yachts = append(yachts, chartersResp.Yachts...)
 	}
 
-	if err := s.storage.InsertUpdateInfo(ctx); err != nil {
-		return errors.Wrap(err, "insert update info")
+	// Put all into storage
+	logo.Info(ctx, "putting data into storage...")
+	if err := s.storage.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		if err := s.storage.ClearAll(ctx, tx); err != nil {
+			return errors.Wrap(err, "clear all")
+		}
+
+		if err := s.storage.InsertBuilders(ctx, tx, buildersResp.Builders); err != nil {
+			return errors.Wrap(err, "insert builders into db")
+		}
+
+		if err := s.storage.InsertModels(ctx, tx, modelsResp.Models); err != nil {
+			return errors.Wrap(err, "insert models into db")
+		}
+
+		if err := s.storage.InsertCharters(ctx, tx, chartersResp.Companies); err != nil {
+			return errors.Wrap(err, "insert charters into db")
+		}
+
+		if err := s.storage.InsertYachts(ctx, tx, yachts); err != nil {
+			return errors.Wrap(err, "insert yachts into db")
+		}
+
+		if err := s.storage.InsertUpdateInfo(ctx, tx); err != nil {
+			return errors.Wrap(err, "insert update info")
+		}
+
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "process sync transaction")
 	}
+
+	logo.Info(ctx, "synchronized with nausys")
 
 	return nil
 }
