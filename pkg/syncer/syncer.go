@@ -13,18 +13,18 @@ import (
 )
 
 type Syncer interface {
-	Sync(ctx context.Context, force bool)
+	Sync(ctx context.Context, force bool) error
 }
 
 type SyncerImpl struct {
-	nausys     nausys.NausysClient
-	storage    storage.Storage
+	nausys  nausys.NausysClient
+	storage storage.Storage
 }
 
 func NewSyncerImpl(nausys nausys.NausysClient, storage storage.Storage) *SyncerImpl {
 	return &SyncerImpl{
-		nausys:     nausys,
-		storage:    storage,
+		nausys:  nausys,
+		storage: storage,
 	}
 }
 

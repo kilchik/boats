@@ -9,6 +9,7 @@ import (
 
 type Config interface {
 	GetEnableDebugLogs() bool
+	GetListenAddr() string
 	GetDSN() string
 	GetNausysAddr() string
 	GetNausysUser() string
@@ -17,6 +18,10 @@ type Config interface {
 
 func (d *Desc) GetEnableDebugLogs() bool {
 	return d.EnableDebugLogs
+}
+
+func (d *Desc) GetListenAddr() string {
+	return d.ListenAddr
 }
 
 func (d *Desc) GetDSN() string {
@@ -56,6 +61,9 @@ func Init(configPath string) (Config, error) {
 }
 
 func validate(d *Desc) error {
+	if d.ListenAddr == "" {
+		return errors.Errorf("%q missing", "listen_addr")
+	}
 	if d.DSN == "" {
 		return errors.Errorf("%q missing", "dsn")
 	}

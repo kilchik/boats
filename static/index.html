@@ -9,7 +9,7 @@
     <div id="app">
         <div class="container">
             <div class="row justify-content-md-center">
-                <div class="col-6" style="margin-top: 20px">
+                <div class="col-9" style="margin-top: 20px">
                     <form>
                         <suggests v-on:change-name="changeBuilderName" v-on:get-suggests="getSuggestsParent" sname="builders" lname="Builder" :suggest-list="buildersList"></suggests>
                         <suggests v-on:change-name="changeModelName" v-on:get-suggests="getSuggestsParent" sname="models" lname="Model" :suggest-list="modelsList"></suggests>
@@ -18,7 +18,7 @@
                 </div>
             </div>
             <div v-if="boatsList[0]" class="row justify-content-md-center">
-                <div class="col-6" style="margin-top: 20px">
+                <div class="col-9" style="margin-top: 20px">
                     <table class="table">
                         <thead>
                         <tr>

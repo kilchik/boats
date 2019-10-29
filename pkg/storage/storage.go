@@ -11,11 +11,11 @@ import (
 )
 
 type YachtInfo struct {
-	Name          string    `db:"name"`
-	BuilderName   string    `db:"builder_name"`
-	ModelName     string    `db:"model_name"`
-	CharterName   string    `db:"charter_name"`
-	AvailableNow  bool      `db:"available_now"`
+	Name          string       `db:"name"`
+	BuilderName   string       `db:"builder_name"`
+	ModelName     string       `db:"model_name"`
+	CharterName   string       `db:"charter_name"`
+	AvailableNow  bool         `db:"available_now"`
 	AvailableFrom sql.NullTime `db:"available_from"`
 	AvailableTo   sql.NullTime `db:"available_to"`
 }
@@ -25,7 +25,7 @@ type Storage interface {
 
 	ClearAll(ctx context.Context, tx *sqlx.Tx) error
 	GetLastUpdateInfo(ctx context.Context) (time.Time, error)
-	InsertBuilders(ctx context.Context, tx *sqlx.Tx,  builders []nausys.Builder) error
+	InsertBuilders(ctx context.Context, tx *sqlx.Tx, builders []nausys.Builder) error
 	InsertModels(ctx context.Context, tx *sqlx.Tx, models []nausys.Model) error
 	InsertCharters(ctx context.Context, tx *sqlx.Tx, charters []nausys.Charter) error
 	InsertYachts(ctx context.Context, tx *sqlx.Tx, yachts []*nausys.Yacht) error
@@ -133,7 +133,6 @@ func (s *StorageImpl) InsertUpdateInfo(ctx context.Context, tx *sqlx.Tx) error {
 	return err
 }
 
-
 func (s *StorageImpl) FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error) {
 	queryCommon := `
 SELECT %s
@@ -171,5 +170,3 @@ func (s *StorageImpl) FindModelsByPrefix(ctx context.Context, prefix string, lim
 	}
 	return res, nil
 }
-
-
