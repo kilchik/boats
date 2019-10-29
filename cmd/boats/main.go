@@ -7,6 +7,7 @@ import (
 	"boats/pkg/syncer"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	_ "github.com/jackc/pgx/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -18,7 +19,10 @@ import (
 )
 
 func main() {
-	cfg, err := config.Init("/Users/akilchik/Documents/go-pets/boats/boats.toml")
+	confPath := flag.String("conf", "boats.toml", "specify path to configuration file")
+	flag.Parse()
+
+	cfg, err := config.Init(*confPath)
 	if err != nil {
 		log.Fatalf("initialize config: %v", err)
 	}
