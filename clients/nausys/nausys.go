@@ -63,12 +63,14 @@ type GetBuildersResponse struct {
 	Builders []Builder `json:"builders"`
 }
 
+type Reservation struct {
+	Id   int64  `json:"yachtId"`
+	From string `json:"periodFrom"`
+	To   string `json:"periodTo"`
+}
+
 type GetOccupancyResponse struct {
-	Reservations []struct {
-		Id   int64  `json:"yachtId"`
-		From string `json:"periodFrom"`
-		To   string `json:"periodTo"`
-	} `json:"reservations"`
+	Reservations []Reservation `json:"reservations"`
 }
 
 type NausysClient interface {

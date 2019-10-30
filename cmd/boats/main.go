@@ -26,6 +26,7 @@ func main() {
 	}
 
 	logo.Init(cfg.GetEnableDebugLogs())
+
 	ctx := context.Background()
 	db := sqlx.MustConnect("pgx", cfg.GetDSN())
 	storage := storage2.NewStorageImpl(db)

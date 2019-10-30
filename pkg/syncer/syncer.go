@@ -28,6 +28,11 @@ func NewSyncerImpl(nausys nausys.NausysClient, storage storage.Storage) *SyncerI
 	}
 }
 
+type reservSlots struct {
+	from []time.Time
+	to   []time.Time
+}
+
 func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 	if !force {
 		_, err := s.storage.GetLastUpdateInfo(ctx)
@@ -67,51 +72,42 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 
 	var yachts []*nausys.Yacht
 	for _, charter := range chartersResp.Companies {
-		occupRes, err := s.nausys.GetOccupancy(ctx, charter.Id, time.Now().Year())
+		// Get reservations for this and next years
+		var charterReservs []nausys.Reservation
+		yearCur := time.Now().Year()
+		occupResYearCur, err := s.nausys.GetOccupancy(ctx, charter.Id, yearCur)
 		if err != nil {
-			return errors.Wrap(err, "get occupancy")
+			return errors.Wrapf(err, "get occupancy for charter %d, year %d", charter.Id, yearCur)
 		}
-		reservs := make(map[int64]*struct {
-			from []time.Time
-			to   []time.Time
-		})
-		for _, r := range occupRes.Reservations {
+		charterReservs = append(charterReservs, occupResYearCur.Reservations...)
+		occupResYearNext, err := s.nausys.GetOccupancy(ctx, charter.Id, yearCur+1)
+		if err != nil {
+			return errors.Wrapf(err, "get occupancy for charter %d, year %d", charter.Id, yearCur+1)
+		}
+		charterReservs = append(charterReservs, occupResYearNext.Reservations...)
+		reservs := make(map[int64]*reservSlots)
+		for _, r := range charterReservs {
 			if _, ok := reservs[r.Id]; !ok {
-				reservs[r.Id] = &struct {
-					from []time.Time
-					to   []time.Time
-				}{}
+				reservs[r.Id] = &reservSlots{}
 			}
 			reservs[r.Id].from = append(reservs[r.Id].from, parseReservTime(r.From))
 			reservs[r.Id].to = append(reservs[r.Id].to, parseReservTime(r.To))
 		}
-		for _, r := range reservs {
-			sort.Slice(r.from, func(i, j int) bool { return r.from[i].Unix() < r.from[j].Unix() })
-			sort.Slice(r.to, func(i, j int) bool { return r.to[i].Unix() < r.to[j].Unix() })
-		}
 
-		chartersResp, err := s.nausys.GetCharterBoats(ctx, charter.Id)
-		if err != nil || chartersResp.Status != "OK" {
+		// Get boats
+		boatsResp, err := s.nausys.GetCharterBoats(ctx, charter.Id)
+		if err != nil || boatsResp.Status != "OK" {
 			return errors.Wrapf(err, "get boats")
 		}
-		for _, y := range chartersResp.Yachts {
-			if rlist, ok := reservs[y.Id]; ok {
-				if len(rlist.from) == 0 {
-					continue
-				}
 
-				if rlist.from[0].Unix() > time.Now().Unix() {
-					y.AvailableFrom = sql.NullTime{time.Now(), true}
-					y.AvailableTo = sql.NullTime{rlist.from[0], true}
-				} else {
-					y.AvailableFrom = sql.NullTime{rlist.to[0], true}
-					if len(rlist.from) > 1 {
-						y.AvailableTo = sql.NullTime{rlist.from[1], true}
-					}
-				}
+		// Set free slot for every yacht
+		for _, y := range boatsResp.Yachts {
+			if _, ok := reservs[y.Id]; ok {
+				y.AvailableFrom, y.AvailableTo = findNextFreeSlot(reservs[y.Id])
 			}
 		}
-		yachts = append(yachts, chartersResp.Yachts...)
+
+		yachts = append(yachts, boatsResp.Yachts...)
 	}
 
 	// Put all into storage
@@ -149,4 +145,42 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 	logo.Info(ctx, "synchronized with nausys")
 
 	return nil
+}
+
+func findNextFreeSlot(reservs *reservSlots) (from, to sql.NullTime) {
+	today := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.UTC)
+
+	// Skip reservations in past
+	var reservsFuture reservSlots
+	for i := 0; i < len(reservs.from); i++ {
+		if reservs.to[i].Before(today) {
+			continue
+		}
+		reservsFuture.from = append(reservsFuture.from, reservs.from[i])
+		reservsFuture.to = append(reservsFuture.to, reservs.to[i])
+	}
+
+	if len(reservsFuture.from) == 0 && len(reservsFuture.to) == 0 {
+		return
+	}
+	sort.Slice(reservsFuture.to, func(i, j int) bool { return reservsFuture.to[i].Before(reservsFuture.to[j]) })
+	sort.Slice(reservsFuture.from, func(i, j int) bool { return reservsFuture.from[i].Before(reservsFuture.from[j]) })
+
+	if today.Add(24 * time.Hour).Before(reservsFuture.from[0]) {
+		from = sql.NullTime{today, true}
+		to = sql.NullTime{reservsFuture.from[0].Add(-24 * time.Hour), true}
+		return
+	}
+
+	for i := 0; i < len(reservsFuture.from)-1; i++ {
+		if reservsFuture.to[i].Add(48 * time.Hour).Before(reservsFuture.from[i+1]) {
+			from = sql.NullTime{reservsFuture.to[i].Add(24 * time.Hour), true}
+			to = sql.NullTime{reservsFuture.from[i+1].Add(-24 * time.Hour), true}
+			return
+		}
+	}
+
+	from = sql.NullTime{reservsFuture.to[len(reservsFuture.to)-1].Add(24 * time.Hour), true}
+
+	return
 }

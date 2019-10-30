@@ -3,7 +3,6 @@ package storage
 import (
 	"boats/clients/nausys"
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -11,13 +10,13 @@ import (
 )
 
 type YachtInfo struct {
-	Name          string       `db:"name"`
-	BuilderName   string       `db:"builder_name"`
-	ModelName     string       `db:"model_name"`
-	CharterName   string       `db:"charter_name"`
-	AvailableNow  bool         `db:"available_now"`
-	AvailableFrom sql.NullTime `db:"available_from"`
-	AvailableTo   sql.NullTime `db:"available_to"`
+	Name          string `db:"name"`
+	BuilderName   string `db:"builder_name"`
+	ModelName     string `db:"model_name"`
+	CharterName   string `db:"charter_name"`
+	AvailableNow  bool   `db:"available_now"`
+	AvailableFrom string `db:"available_from"`
+	AvailableTo   string `db:"available_to"`
 }
 
 type Storage interface {
@@ -143,7 +142,7 @@ WHERE B.name LIKE $1 AND M.name LIKE $2`
 			return errors.Wrap(err, "select total number of yachts")
 		}
 
-		query := fmt.Sprintf(queryCommon, "Y.name AS name, B.name AS builder_name, M.name AS model_name, C.name AS charter_name, COALESCE(Y.available_from < NOW(), TRUE) AS available_now, Y.available_from, Y.available_to") +
+		query := fmt.Sprintf(queryCommon, "Y.name AS name, B.name AS builder_name, M.name AS model_name, C.name AS charter_name, COALESCE(Y.available_from < NOW(), TRUE) AS available_now, COALESCE(to_char(Y.available_from, 'DD Mon YYYY'), '') AS available_from, COALESCE(to_char(Y.available_to, 'DD Mon YYYY'), '') AS available_to") +
 			"OFFSET $3 LIMIT $4;"
 		if err = tx.SelectContext(ctx, &yachts, query, builderNamePrefix+"%", modelNamePrefix+"%", offset, limit); err != nil {
 			return errors.Wrap(err, "select yachts")
