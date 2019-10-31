@@ -101,9 +101,10 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 		}
 
 		// Set free slot for every yacht
+		today := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.UTC)
 		for _, y := range boatsResp.Yachts {
 			if _, ok := reservs[y.Id]; ok {
-				y.AvailableFrom, y.AvailableTo = findNextFreeSlot(reservs[y.Id])
+				y.AvailableFrom, y.AvailableTo = findNextFreeSlot(today, reservs[y.Id])
 			}
 		}
 
@@ -147,9 +148,7 @@ func (s *SyncerImpl) Sync(ctx context.Context, force bool) error {
 	return nil
 }
 
-func findNextFreeSlot(reservs *reservSlots) (from, to sql.NullTime) {
-	today := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.UTC)
-
+func findNextFreeSlot(today time.Time, reservs *reservSlots) (from, to sql.NullTime) {
 	// Skip reservations in past
 	var reservsFuture reservSlots
 	for i := 0; i < len(reservs.from); i++ {

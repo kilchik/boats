@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const timeoutDefault = 5 * time.Second
+const timeoutDefault = 10 * time.Second
 
 type nausysCreds struct {
 	Username string `json:"username"`

@@ -1,3 +1,4 @@
-build:
+run:
 	GOOS=linux go build -o ./bin/boats ./cmd/boats/main.go
-	docker build -t boats .
+	docker-compose build --no-cache
+	docker-compose up

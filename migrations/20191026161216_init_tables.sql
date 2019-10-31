@@ -2,12 +2,12 @@
 -- SQL in this section is executed when the migration is applied.
 
 CREATE TABLE "builders" (
-    id BIGINT PRIMARY KEY NOT NULL,
+    id BIGINT PRIMARY KEY UNIQUE NOT NULL,
     name VARCHAR(60) NOT NULL
 );
 
 CREATE TABLE "models" (
-    id BIGINT PRIMARY KEY NOT NULL,
+    id BIGINT PRIMARY KEY UNIQUE NOT NULL,
     name VARCHAR(60) NOT NULL,
     builder_id BIGINT NOT NULL,
 
@@ -15,12 +15,12 @@ CREATE TABLE "models" (
 );
 
 CREATE TABLE "charters" (
-    id BIGINT PRIMARY KEY NOT NULL,
+    id BIGINT PRIMARY KEY UNIQUE NOT NULL,
     name VARCHAR(60) NOT NULL
 );
 
 CREATE TABLE "yachts" (
-    id BIGINT PRIMARY KEY NOT NULL,
+    id BIGINT PRIMARY KEY  NOT NULL,
     name VARCHAR(60) NOT NULL,
     model_id BIGINT NOT NULL,
     charter_id BIGINT NOT NULL,

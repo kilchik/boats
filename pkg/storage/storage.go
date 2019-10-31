@@ -22,13 +22,13 @@ type YachtInfo struct {
 type Storage interface {
 	WithTransaction(ctx context.Context, f func(tx *sqlx.Tx) error) (err error)
 
-	ClearAll(ctx context.Context, tx *sqlx.Tx) error
+	ClearAll(ctx context.Context, querier sqlx.ExecerContext) error
 	GetLastUpdateInfo(ctx context.Context) (time.Time, error)
-	InsertBuilders(ctx context.Context, tx *sqlx.Tx, builders []nausys.Builder) error
-	InsertModels(ctx context.Context, tx *sqlx.Tx, models []nausys.Model) error
-	InsertCharters(ctx context.Context, tx *sqlx.Tx, charters []nausys.Charter) error
-	InsertYachts(ctx context.Context, tx *sqlx.Tx, yachts []*nausys.Yacht) error
-	InsertUpdateInfo(ctx context.Context, tx *sqlx.Tx) error
+	InsertBuilders(ctx context.Context, querier sqlx.ExecerContext, builders []nausys.Builder) error
+	InsertModels(ctx context.Context, querier sqlx.ExecerContext, models []nausys.Model) error
+	InsertCharters(ctx context.Context, querier sqlx.ExecerContext, charters []nausys.Charter) error
+	InsertYachts(ctx context.Context, querier sqlx.ExecerContext, yachts []*nausys.Yacht) error
+	InsertUpdateInfo(ctx context.Context, querier sqlx.ExecerContext) error
 
 	FindYachts(ctx context.Context, builderNamePrefix, modelNamePrefix string, limit, offset int) (yachts []YachtInfo, total int64, err error)
 	FindBuildersByPrefix(ctx context.Context, prefix string, limit int) ([]string, error)
@@ -71,15 +71,15 @@ func (s *StorageImpl) WithTransaction(ctx context.Context, f func(tx *sqlx.Tx) e
 	return err
 }
 
-func (s *StorageImpl) ClearAll(ctx context.Context, tx *sqlx.Tx) error {
-	_, err := tx.ExecContext(ctx, `
+func (s *StorageImpl) ClearAll(ctx context.Context, querier sqlx.ExecerContext) error {
+	_, err := querier.ExecContext(ctx, `
 TRUNCATE models, charters, builders, yachts, update_info;`)
 	return err
 }
 
-func (s *StorageImpl) InsertBuilders(ctx context.Context, tx *sqlx.Tx, builders []nausys.Builder) error {
+func (s *StorageImpl) InsertBuilders(ctx context.Context, querier sqlx.ExecerContext, builders []nausys.Builder) error {
 	for _, builder := range builders {
-		_, err := tx.ExecContext(ctx, "INSERT INTO builders(id, name) VALUES ($1, $2)", builder.Id, builder.Name)
+		_, err := querier.ExecContext(ctx, "INSERT INTO builders(id, name) VALUES ($1, $2)", builder.Id, builder.Name)
 		if err != nil {
 			return err
 		}
@@ -88,9 +88,9 @@ func (s *StorageImpl) InsertBuilders(ctx context.Context, tx *sqlx.Tx, builders 
 	return nil
 }
 
-func (s *StorageImpl) InsertModels(ctx context.Context, tx *sqlx.Tx, models []nausys.Model) error {
+func (s *StorageImpl) InsertModels(ctx context.Context, querier sqlx.ExecerContext, models []nausys.Model) error {
 	for _, model := range models {
-		_, err := tx.ExecContext(ctx, "INSERT INTO models(id, name, builder_id) VALUES ($1, $2, $3)",
+		_, err := querier.ExecContext(ctx, "INSERT INTO models(id, name, builder_id) VALUES ($1, $2, $3)",
 			model.Id, model.Name, model.BuilderId)
 		if err != nil {
 			return err
@@ -99,9 +99,9 @@ func (s *StorageImpl) InsertModels(ctx context.Context, tx *sqlx.Tx, models []na
 	return nil
 }
 
-func (s *StorageImpl) InsertCharters(ctx context.Context, tx *sqlx.Tx, charters []nausys.Charter) error {
+func (s *StorageImpl) InsertCharters(ctx context.Context, querier sqlx.ExecerContext, charters []nausys.Charter) error {
 	for _, charter := range charters {
-		_, err := tx.ExecContext(ctx, "INSERT INTO charters(id, name) VALUES ($1, $2)", charter.Id, charter.Name)
+		_, err := querier.ExecContext(ctx, "INSERT INTO charters(id, name) VALUES ($1, $2)", charter.Id, charter.Name)
 		if err != nil {
 			return err
 		}
@@ -109,9 +109,9 @@ func (s *StorageImpl) InsertCharters(ctx context.Context, tx *sqlx.Tx, charters 
 	return nil
 }
 
-func (s *StorageImpl) InsertYachts(ctx context.Context, tx *sqlx.Tx, yachts []*nausys.Yacht) error {
+func (s *StorageImpl) InsertYachts(ctx context.Context, querier sqlx.ExecerContext, yachts []*nausys.Yacht) error {
 	for _, yacht := range yachts {
-		_, err := tx.ExecContext(ctx, `
+		_, err := querier.ExecContext(ctx, `
 INSERT INTO yachts(id, name, model_id, charter_id, available_from, available_to) VALUES ($1, $2, $3, $4, $5, $6)`,
 			yacht.Id, yacht.Name, yacht.ModelId, yacht.CharterId, yacht.AvailableFrom, yacht.AvailableTo)
 		if err != nil {
@@ -127,8 +127,8 @@ func (s *StorageImpl) GetLastUpdateInfo(ctx context.Context) (time.Time, error) 
 	return updatedAt, err
 }
 
-func (s *StorageImpl) InsertUpdateInfo(ctx context.Context, tx *sqlx.Tx) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO update_info(moment) VALUES (NOW())`)
+func (s *StorageImpl) InsertUpdateInfo(ctx context.Context, querier sqlx.ExecerContext) error {
+	_, err := querier.ExecContext(ctx, `INSERT INTO update_info(moment) VALUES (NOW())`)
 	return err
 }
 
