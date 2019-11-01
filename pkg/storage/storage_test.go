@@ -26,7 +26,6 @@ func (s *TestStorageSuite) SetupTest() {
 
 func (s *TestStorageSuite) initDB() *sqlx.DB {
 	dsn := os.Getenv("DSN")
-	dsn = "postgres://testusr:123@127.0.0.1:5432/boats_db"
 	if dsn == "" {
 		s.FailNow("pass DSN in env var")
 	}

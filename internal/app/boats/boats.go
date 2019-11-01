@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const updateInterval = 1 * time.Second
+const (
+	updateInterval = 1 * time.Second
+	suggestListLimit = 10
+)
 
 type BoatsServer struct {
 	storage   storage.Storage
@@ -57,9 +60,9 @@ func (s *BoatsServer) HandleSuggest(ctx context.Context, w http.ResponseWriter, 
 	var err error
 	switch param {
 	case "builders":
-		names, err = s.storage.FindBuildersByPrefix(ctx, prefix, 5)
+		names, err = s.storage.FindBuildersByPrefix(ctx, prefix, suggestListLimit)
 	case "models":
-		names, err = s.storage.FindModelsByPrefix(ctx, prefix, 5)
+		names, err = s.storage.FindModelsByPrefix(ctx, prefix, suggestListLimit)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		return
